@@ -2,7 +2,7 @@ import { extension_settings, getContext } from "../../../extensions.js";
 import { saveSettingsDebounced } from "../../../../script.js";
 import { Popup, POPUP_TYPE } from '../../../popup.js';
 
-// 插件名称和设置
+// 插件名称和默认设置
 const extensionName = "message-navigator";
 const defaultSettings = {
     realTimeRendering: true,  // 默认启用实时渲染
@@ -24,6 +24,7 @@ jQuery(async () => {
             <div class="keyword-search-area">
                 <input type="text" id="keyword-search" placeholder="输入关键词">
                 <button id="search-button">[清空]</button>
+                <div id="search-results"></div>
             </div>
             <div class="quick-scroll-area">
                 <button id="scroll-up">↑</button>
@@ -47,7 +48,7 @@ function updateSearchButtonText() {
 
 // 绑定事件
 function bindEvents() {
-    $("#scroll-up").on("click", scrollToFirstMessage);
+    $("#scroll-up").on("click", scrollToFirstLoadedMessage);
     $("#scroll-down").on("click", scrollToLastMessage);
     $("#jump-to-floor").on("click", showJumpToFloorPopup);
     $("#advanced-settings").on("click", showAdvancedSettingsPopup);
@@ -55,12 +56,14 @@ function bindEvents() {
     $("#keyword-search").on("input", handleKeywordInput);
 }
 
-// 滚动到最早消息
-function scrollToFirstMessage() {
-    const context = getContext();
-    const chat = context.chat;
-    if (chat.length > 0) {
-        scrollToMessage(0); // mesid 从 0 开始
+// 滚动到最早的已加载消息
+function scrollToFirstLoadedMessage() {
+    const loadedMessages = $("#chat .mes");
+    if (loadedMessages.length > 0) {
+        const firstMesId = parseInt(loadedMessages.first().attr("mesid"));
+        scrollToMessage(firstMesId);
+    } else {
+        toastr.error("没有已加载的消息");
     }
 }
 
@@ -88,37 +91,34 @@ async function showJumpToFloorPopup() {
     const popupHtml = `
         <div>
             <input type="number" id="floor-input" placeholder="输入楼层号">
-            <div id="floor-info"></div>
+            <div id="floor-info" style="cursor: pointer;"></div>
         </div>
     `;
-    const popup = new Popup(popupHtml, POPUP_TYPE.INPUT);
+    const popup = new Popup(popupHtml, POPUP_TYPE.TEXT);
     popup.show();
 
-    $("#floor-input").on("input", handleFloorInput);
-    $("#floor-input").on("blur", () => {
+    $("#floor-input").on("input", function() {
+        const floor = parseInt($(this).val());
+        if (!isNaN(floor)) {
+            const context = getContext();
+            const chat = context.chat;
+            if (floor >= 0 && floor < chat.length) {
+                $("#floor-info").text(`楼层 ${floor}: ${chat[floor].mes.substring(0, 50)}...`);
+            } else {
+                $("#floor-info").text("楼层不存在");
+            }
+        } else {
+            $("#floor-info").text("");
+        }
+    });
+
+    $("#floor-info").on("click", function() {
         const floor = parseInt($("#floor-input").val());
         if (!isNaN(floor)) {
             scrollToMessage(floor);
             popup.close();
         }
     });
-}
-
-// 处理楼层输入
-function handleFloorInput() {
-    const floor = parseInt($("#floor-input").val());
-    if (!isNaN(floor)) {
-        const context = getContext();
-        const chat = context.chat;
-        if (floor >= 0 && floor < chat.length) {
-            const message = chat[floor];
-            $("#floor-info").text(`楼层 ${floor}: ${message.mes.substring(0, 50)}...`);
-        } else {
-            $("#floor-info").text("楼层不存在");
-        }
-    } else {
-        $("#floor-info").text("");
-    }
 }
 
 // 显示高级检索设置弹窗
@@ -146,9 +146,32 @@ async function showAdvancedSettingsPopup() {
 
 // 处理关键词输入（实时检索）
 function handleKeywordInput() {
-    if (extension_settings[extensionName].realTimeRendering) {
-        const keyword = $("#keyword-search").val();
-        searchMessages(keyword);
+    const keyword = $("#keyword-search").val();
+    if (keyword) {
+        const context = getContext();
+        const chat = context.chat;
+        const results = [];
+        chat.forEach((message, index) => {
+            if (message.mes.includes(keyword)) {
+                results.push({ mesId: index, text: message.mes.substring(0, 50) + "..." });
+            }
+        });
+        const resultsContainer = $("#search-results");
+        resultsContainer.empty();
+        if (results.length > 0) {
+            results.forEach(result => {
+                resultsContainer.append(
+                    `<div class="search-result" data-mesid="${result.mesId}">${result.text}</div>`
+                );
+            });
+            $(".search-result").on("click", function() {
+                scrollToMessage($(this).data("mesid"));
+            });
+        } else {
+            resultsContainer.text("未找到匹配的消息");
+        }
+    } else {
+        $("#search-results").empty();
     }
 }
 
@@ -156,50 +179,9 @@ function handleKeywordInput() {
 function handleSearchButtonClick() {
     if (extension_settings[extensionName].realTimeRendering) {
         $("#keyword-search").val(""); // 清空输入框
-        clearSearchHighlights();
+        $("#search-results").empty(); // 清空检索结果
     } else {
         const keyword = $("#keyword-search").val();
-        searchMessages(keyword);
+        handleKeywordInput(); // 触发检索
     }
-}
-
-// 检索消息并高亮关键词
-function searchMessages(keyword) {
-    if (!keyword) {
-        clearSearchHighlights();
-        return;
-    }
-    const context = getContext();
-    const chat = context.chat;
-    let found = false;
-    chat.forEach((message, index) => {
-        if (message.mes.includes(keyword)) {
-            found = true;
-            if (extension_settings[extensionName].highlightKeywords) {
-                highlightMessage(index, keyword);
-            }
-            scrollToMessage(index); // 滚动到第一个匹配的消息
-            return; // 只滚动到第一个匹配项
-        }
-    });
-    if (!found) {
-        toastr.error("未找到匹配的消息");
-    }
-}
-
-// 高亮指定消息中的关键词
-function highlightMessage(mesId, keyword) {
-    const messageElement = $(`#chat .mes[mesid="${mesId}"] .mes_text`);
-    if (messageElement.length > 0) {
-        const text = messageElement.text();
-        const highlightedText = text.replace(new RegExp(keyword, "gi"), match => `<span class="highlight">${match}</span>`);
-        messageElement.html(highlightedText);
-    }
-}
-
-// 清除高亮
-function clearSearchHighlights() {
-    $("#chat .mes .mes_text .highlight").each(function() {
-        $(this).replaceWith($(this).text());
-    });
 }
