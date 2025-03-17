@@ -1,0 +1,32 @@
+#message-navigator {
+    position: fixed;
+    left: 0;
+    top: 150px;
+    width: 200px;
+    background-color: #f0f0f0;
+    padding: 10px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 1000; /* 确保在其他元素之上 */
+}
+
+.keyword-search-area {
+    margin-bottom: 10px;
+}
+
+.keyword-search-area input {
+    width: 70%;
+    margin-right: 5px;
+}
+
+.quick-scroll-area {
+    margin-bottom: 10px;
+}
+
+.quick-scroll-area button {
+    margin-right: 5px;
+}
+
+.highlight {
+    background-color: yellow;
+    font-weight: bold;
+}
