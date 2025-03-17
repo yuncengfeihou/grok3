@@ -18,6 +18,10 @@
     margin-right: 5px;
 }
 
+.keyword-search-area button {
+    margin-right: 5px;
+}
+
 .quick-scroll-area {
     margin-bottom: 10px;
 }
@@ -47,19 +51,13 @@
     font-weight: bold;
 }
 
-/* 新增样式 */
-#floor-message-preview {
-    cursor: pointer;
-    overflow-y: hidden; /* 默认隐藏滚动条 */
-    max-height: 50px; /* 初始最大高度，可以根据需要调整 */
-    transition: max-height 0.3s ease-out; /* 添加过渡效果 */
-    border: 1px solid #ccc;
-    padding: 5px;
-    margin-bottom: 5px;
+/* 新增样式用于完整消息容器 */
+#full-message-container {
+    background-color: #f9f9f9; /* 可选：设置容器背景色 */
 }
 
-#floor-message-preview.expanded-message-preview {
-    max-height: 80vh; /* 展开时的高度 */
-    overflow-y: auto; /* 展开时显示滚动条 */
-    white-space: pre-wrap; /* 保留换行符和空格 */
+#full-message-text {
+    font-family: monospace; /* 可选：使用等宽字体更易阅读 */
+    font-size: 14px;       /* 可选：调整字体大小 */
+    line-height: 1.4;      /* 可选：调整行高 */
 }
