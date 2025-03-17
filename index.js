@@ -88,35 +88,72 @@ function scrollToMessage(mesId) {
 
 // 显示跳转指定楼层弹窗
 async function showJumpToFloorPopup() {
+    let selectedFloor = null; // 用于存储当前选中的楼层
+    let fullMessageText = "";   // 用于存储完整消息文本
+
     const popupHtml = `
         <div>
             <input type="number" id="floor-input" placeholder="输入楼层号">
-            <div id="floor-info" style="cursor: pointer;"></div>
+            <div id="floor-info-preview" style="cursor: pointer;"></div>
+            <div id="full-message-container" style="display: none; max-height: 80vh; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-top: 5px;">
+                <pre id="full-message-text" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
+            </div>
+            <div style="margin-top: 10px;">
+                <button id="jump-ok-button">OK</button>
+                <button id="jump-button" style="margin-left: 5px;">跳转</button>
+            </div>
         </div>
     `;
     const popup = new Popup(popupHtml, POPUP_TYPE.TEXT);
     popup.show();
 
-    $("#floor-input").on("input", function() {
+    const $floorInput = $("#floor-input");
+    const $floorInfoPreview = $("#floor-info-preview");
+    const $fullMessageContainer = $("#full-message-container");
+    const $fullMessageText = $("#full-message-text");
+    const $jumpOkButton = $("#jump-ok-button");
+    const $jumpButton = $("#jump-button");
+
+
+    $floorInput.on("input", function() {
         const floor = parseInt($(this).val());
+        selectedFloor = isNaN(floor) ? null : floor; // 更新 selectedFloor
         if (!isNaN(floor)) {
             const context = getContext();
             const chat = context.chat;
             if (floor >= 0 && floor < chat.length) {
-                $("#floor-info").text(`楼层 ${floor}: ${chat[floor].mes.substring(0, 50)}...`);
+                const previewText = chat[floor].mes.substring(0, 50) + "...";
+                $floorInfoPreview.text(`楼层 ${floor}: ${previewText}`);
+                fullMessageText = chat[floor].mes; // 获取完整消息文本
             } else {
-                $("#floor-info").text("楼层不存在");
+                $floorInfoPreview.text("楼层不存在");
+                fullMessageText = "";
             }
+            $fullMessageContainer.hide(); // 隐藏完整消息容器，直到点击预览
         } else {
-            $("#floor-info").text("");
+            $floorInfoPreview.text("");
+            fullMessageText = "";
+            $fullMessageContainer.hide();
         }
     });
 
-    $("#floor-info").on("click", function() {
-        const floor = parseInt($("#floor-input").val());
-        if (!isNaN(floor)) {
-            scrollToMessage(floor);
+    $floorInfoPreview.on("click", function() {
+        if (selectedFloor !== null && fullMessageText) {
+            $fullMessageText.text(fullMessageText); // 设置完整消息文本
+            $fullMessageContainer.slideDown();      // 显示完整消息容器，使用动画效果
+        }
+    });
+
+    $jumpOkButton.on("click", function() {
+        if (selectedFloor !== null) {
+            scrollToMessage(selectedFloor);
             popup.close();
+        }
+    });
+
+    $jumpButton.on("click", function() {
+        if (selectedFloor !== null) {
+            scrollToMessage(selectedFloor); // 点击跳转按钮也执行跳转
         }
     });
 }
@@ -184,4 +221,66 @@ function handleSearchButtonClick() {
         const keyword = $("#keyword-search").val();
         handleKeywordInput(); // 触发检索
     }
+}
+```
+
+**修改后的 `style.css.txt` 文件：**
+
+```css
+#message-navigator {
+    position: fixed;
+    left: 0;
+    top: 150px;
+    width: 200px;
+    background-color: #f0f0f0;
+    padding: 10px;
+    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+    z-index: 1000; /* 确保在其他元素之上 */
+}
+
+.keyword-search-area {
+    margin-bottom: 10px;
+}
+
+.keyword-search-area input {
+    width: 70%;
+    margin-right: 5px;
+}
+
+.keyword-search-area button {
+    margin-right: 5px;
+}
+
+.quick-scroll-area {
+    margin-bottom: 10px;
+}
+
+.quick-scroll-area button {
+    margin-right: 5px;
+}
+
+#search-results {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 5px;
+}
+
+.search-result {
+    cursor: pointer;
+    padding: 5px;
+    border-bottom: 1px solid #ddd;
+}
+
+.search-result:hover {
+    background-color: #e0e0e0;
+}
+
+.highlight {
+    background-color: yellow;
+    font-weight: bold;
+}
+
+/* 新增样式用于完整消息容器 */
+#full-message-container {
+    background-color: #f9f9f9; /* 可选：设置容器背景色 */
 }
