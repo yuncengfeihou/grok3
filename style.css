@@ -26,6 +26,22 @@
     margin-right: 5px;
 }
 
+#search-results {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 5px;
+}
+
+.search-result {
+    cursor: pointer;
+    padding: 5px;
+    border-bottom: 1px solid #ddd;
+}
+
+.search-result:hover {
+    background-color: #e0e0e0;
+}
+
 .highlight {
     background-color: yellow;
     font-weight: bold;
