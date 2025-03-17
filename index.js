@@ -50,7 +50,7 @@ function updateSearchButtonText() {
 function bindEvents() {
     $("#scroll-up").on("click", scrollToFirstLoadedMessage);
     $("#scroll-down").on("click", scrollToLastMessage);
-    $("#jump-to-floor").on("click", showJumpToFloorPopup);
+    $("#jump-to-floor").on("click", () => showJumpToFloorPopup());
     $("#advanced-settings").on("click", showAdvancedSettingsPopup);
     $("#search-button").on("click", handleSearchButtonClick);
     $("#keyword-search").on("input", handleKeywordInput);
@@ -86,21 +86,16 @@ function scrollToMessage(mesId) {
     }
 }
 
-// 显示跳转指定楼层弹窗
-async function showJumpToFloorPopup() {
-    let selectedFloor = null; // 用于存储当前选中的楼层
-    let fullMessageText = "";   // 用于存储完整消息文本
-
+// 显示跳转指定楼层弹窗（支持传入 mesId）
+async function showJumpToFloorPopup(selectedMesId = null) {
     const popupHtml = `
-        <div>
+        <div class="jump-to-floor-container">
             <input type="number" id="floor-input" placeholder="输入楼层号">
-            <div id="floor-info-preview" style="cursor: pointer;"></div>
-            <div id="full-message-container" style="display: none; max-height: 80vh; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-top: 5px;">
-                <pre id="full-message-text" style="white-space: pre-wrap; word-wrap: break-word;"></pre>
-            </div>
-            <div style="margin-top: 10px;">
-                <button id="jump-ok-button">OK</button>
-                <button id="jump-button" style="margin-left: 5px;">跳转</button>
+            <div id="floor-info" style="cursor: pointer;"></div>
+            <div id="full-message-container" style="display: none; max-height: 80vh; overflow-y: auto; padding: 10px; border: 1px solid #ddd;"></div>
+            <div class="popup-buttons">
+                <button id="ok-button">[OK]</button>
+                <button id="jump-button" style="display: none;">[跳转]</button>
             </div>
         </div>
     `;
@@ -108,54 +103,63 @@ async function showJumpToFloorPopup() {
     popup.show();
 
     const $floorInput = $("#floor-input");
-    const $floorInfoPreview = $("#floor-info-preview");
+    const $floorInfo = $("#floor-info");
     const $fullMessageContainer = $("#full-message-container");
-    const $fullMessageText = $("#full-message-text");
-    const $jumpOkButton = $("#jump-ok-button");
     const $jumpButton = $("#jump-button");
 
-
+    // 输入楼层号时更新预览
     $floorInput.on("input", function() {
         const floor = parseInt($(this).val());
-        selectedFloor = isNaN(floor) ? null : floor; // 更新 selectedFloor
         if (!isNaN(floor)) {
             const context = getContext();
             const chat = context.chat;
             if (floor >= 0 && floor < chat.length) {
-                const previewText = chat[floor].mes.substring(0, 50) + "...";
-                $floorInfoPreview.text(`楼层 ${floor}: ${previewText}`);
-                fullMessageText = chat[floor].mes; // 获取完整消息文本
+                $floorInfo.text(`楼层 ${floor}: ${chat[floor].mes.substring(0, 50)}...`);
+                $fullMessageContainer.text(chat[floor].mes).show();
+                $fullMessageContainer.css({ height: "80vh" }); // 扩展到屏幕高度的 80%
+                $jumpButton.show();
             } else {
-                $floorInfoPreview.text("楼层不存在");
-                fullMessageText = "";
+                $floorInfo.text("楼层不存在");
+                $fullMessageContainer.hide();
+                $jumpButton.hide();
             }
-            $fullMessageContainer.hide(); // 隐藏完整消息容器，直到点击预览
         } else {
-            $floorInfoPreview.text("");
-            fullMessageText = "";
+            $floorInfo.text("");
             $fullMessageContainer.hide();
+            $jumpButton.hide();
         }
     });
 
-    $floorInfoPreview.on("click", function() {
-        if (selectedFloor !== null && fullMessageText) {
-            $fullMessageText.text(fullMessageText); // 设置完整消息文本
-            $fullMessageContainer.slideDown();      // 显示完整消息容器，使用动画效果
-        }
-    });
-
-    $jumpOkButton.on("click", function() {
-        if (selectedFloor !== null) {
-            scrollToMessage(selectedFloor);
+    // 点击楼层预览时跳转
+    $floorInfo.on("click", function() {
+        const floor = parseInt($floorInput.val());
+        if (!isNaN(floor)) {
+            scrollToMessage(floor);
             popup.close();
         }
     });
 
+    // 点击跳转按钮时滚动到消息
     $jumpButton.on("click", function() {
-        if (selectedFloor !== null) {
-            scrollToMessage(selectedFloor); // 点击跳转按钮也执行跳转
+        const floor = parseInt($floorInput.val());
+        if (!isNaN(floor)) {
+            scrollToMessage(floor);
+            popup.close();
         }
     });
+
+    // 如果有传入的 mesId（从检索结果点击时），直接显示对应消息
+    if (selectedMesId !== null) {
+        const context = getContext();
+        const chat = context.chat;
+        if (selectedMesId >= 0 && selectedMesId < chat.length) {
+            $floorInput.val(selectedMesId);
+            $floorInfo.text(`楼层 ${selectedMesId}: ${chat[selectedMesId].mes.substring(0, 50)}...`);
+            $fullMessageContainer.text(chat[selectedMesId].mes).show();
+            $fullMessageContainer.css({ height: "80vh" }); // 扩展到屏幕高度的 80%
+            $jumpButton.show();
+        }
+    }
 }
 
 // 显示高级检索设置弹窗
@@ -202,7 +206,8 @@ function handleKeywordInput() {
                 );
             });
             $(".search-result").on("click", function() {
-                scrollToMessage($(this).data("mesid"));
+                const mesId = $(this).data("mesid");
+                showJumpToFloorPopup(mesId); // 点击时显示弹窗并传入 mesId
             });
         } else {
             resultsContainer.text("未找到匹配的消息");
@@ -218,69 +223,6 @@ function handleSearchButtonClick() {
         $("#keyword-search").val(""); // 清空输入框
         $("#search-results").empty(); // 清空检索结果
     } else {
-        const keyword = $("#keyword-search").val();
         handleKeywordInput(); // 触发检索
     }
-}
-```
-
-**修改后的 `style.css.txt` 文件：**
-
-```css
-#message-navigator {
-    position: fixed;
-    left: 0;
-    top: 150px;
-    width: 200px;
-    background-color: #f0f0f0;
-    padding: 10px;
-    box-shadow: 2px 0 5px rgba(0,0,0,0.1);
-    z-index: 1000; /* 确保在其他元素之上 */
-}
-
-.keyword-search-area {
-    margin-bottom: 10px;
-}
-
-.keyword-search-area input {
-    width: 70%;
-    margin-right: 5px;
-}
-
-.keyword-search-area button {
-    margin-right: 5px;
-}
-
-.quick-scroll-area {
-    margin-bottom: 10px;
-}
-
-.quick-scroll-area button {
-    margin-right: 5px;
-}
-
-#search-results {
-    max-height: 200px;
-    overflow-y: auto;
-    margin-top: 5px;
-}
-
-.search-result {
-    cursor: pointer;
-    padding: 5px;
-    border-bottom: 1px solid #ddd;
-}
-
-.search-result:hover {
-    background-color: #e0e0e0;
-}
-
-.highlight {
-    background-color: yellow;
-    font-weight: bold;
-}
-
-/* 新增样式用于完整消息容器 */
-#full-message-container {
-    background-color: #f9f9f9; /* 可选：设置容器背景色 */
 }
